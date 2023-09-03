@@ -7,11 +7,11 @@ const uuid = require('uuid').v4;
 class AuthController {
   static async getConnect(req, res) {
     const authHeader = req.headers.authorization;
-    
+
     if (!authHeader || !authHeader.startsWith('Basic ')) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
-    
+
     // Extract the base64-encoded email and password
     const base64Credentials = authHeader.split(' ')[1];
     const credentials = Buffer.from(base64Credentials, 'base64').toString('utf-8');
@@ -42,7 +42,7 @@ class AuthController {
     }
 
     // Retrieve the user ID from Redis
-    const userId = await redisClient.get(`auth_${token}`);
+    const userId = await RedisClient.get(`auth_${token}`);
 
     if (!userId) {
       return res.status(401).json({ error: 'Unauthorized' });

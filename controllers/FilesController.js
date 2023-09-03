@@ -1,6 +1,6 @@
 import DBClient from '../utils/db';
 import RedisClient from '../utils/redis';
-const { ObjectId } = require('mongodb');
+
 const uuid = require('uuid').v4;
 const fs = require('fs');
 const path = require('path');
@@ -13,7 +13,9 @@ class FilesController {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const { name, type, parentId = '0', isPublic = false, data } = req.body;
+    const {
+      name, type, parentId = '0', isPublic = false, data,
+    } = req.body;
 
     if (!name) {
       return res.status(400).json({ error: 'Missing name' });

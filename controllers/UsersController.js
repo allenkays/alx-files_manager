@@ -1,5 +1,6 @@
 import DBClient from '../utils/db';
 import RedisClient from '../utils/redis';
+
 const { ObjectId } = require('mongodb');
 const sha1 = require('sha1');
 
@@ -34,7 +35,7 @@ class UsersController {
 
       const responseUser = {
         email: result.ops[0].email,
-        id : result.insertedId
+        id: result.insertedId,
       };
 
       return res.status(201).json(responseUser);
