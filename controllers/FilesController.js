@@ -1,6 +1,7 @@
 import DBClient from '../utils/db';
 import RedisClient from '../utils/redis';
 
+const { ObjectId } = require('mongodb');
 const uuid = require('uuid').v4;
 const fs = require('fs');
 const path = require('path');
@@ -29,17 +30,23 @@ class FilesController {
       return res.status(400).json({ error: 'Missing data' });
     }
 
-    // Remove the unnecessary conditional check for parentId here
+    if (parentId !== '0') {
+      const parentFile = await DBClient.db.collection('files').findOne({
+        _id: ObjectId(parentId),
+        type: 'folder',
+      });
+
+      if (!parentFile) {
+        return res.status(400).json({ error: 'Parent not found' });
+      }
+    }
 
     const folderPath = process.env.FOLDER_PATH || '/tmp/files_manager';
     if (!fs.existsSync(folderPath)) {
       fs.mkdirSync(folderPath, { recursive: true });
     }
 
-    /* Generate a unique filename (UUID) */
     const filename = uuid();
-
-    /* Define the local file path */
     const localPath = path.join(folderPath, filename);
 
     /* Store the file locally (for non-folder types) */
@@ -61,6 +68,52 @@ class FilesController {
     const result = await DBClient.db.collection('files').insertOne(newFile);
 
     return res.status(201).json(result.ops[0]);
+  }
+
+  static async getShow(req, res) {
+    const userId = await RedisClient.get(`auth_${req.header('X-Token')}`);
+
+    if (!userId) {
+      return res.status(401).json({error: 'Unauthorized'});
+    }
+
+    const fileId  = req.params.id;
+
+    const file = await DBClient.db.collection('files').findOne({
+      _id: ObjectId(fileId),
+      userId: ObjectId(userId),
+    });
+
+    if (!file) {
+      return res.status(404).json({error: 'Not Found'});
+    }
+
+    return res.json(file);
+  }
+
+  static async getIndex(req, res) {
+    const userId = await RedisClient.get(`auth_${req.header('X-Token')}`);
+
+    if (!userId) {
+      return res.status(401).json({error: 'Unauthorized'})
+    }
+
+    const { parentId = '0', page = 0 } = req.query;
+
+    /* MongoDB aggregation for pagination */
+    const pageSize = 20;
+    const skip = page * pageSize;
+
+    const files = await DBClient.db.collection('files')
+      .find({
+        userId: ObjectId(userId),
+        parentId: parentId === '0' ? '0' : ObjectId(parentId),
+      })
+      .skip(skip)
+      .limit(pageSize)
+      .toArray();
+
+    return res.json(files);
   }
 }
 
