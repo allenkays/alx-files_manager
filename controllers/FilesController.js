@@ -5,6 +5,7 @@ const { ObjectId } = require('mongodb');
 const uuid = require('uuid').v4;
 const fs = require('fs');
 const path = require('path');
+const mime = require('mime-types');
 
 class FilesController {
   static async postUpload(req, res) {
@@ -120,7 +121,7 @@ class FilesController {
     const userId = await RedisClient.get(`auth_${req.header('X-Token')}`);
 
     if (!userId) {
-      return res.status(401).json({error: 'Unauthorized'});
+      return res.status(401).json({ error: 'Unauthorized' });
     }
 
     const fileId = req.params.id;
@@ -137,7 +138,7 @@ class FilesController {
     /* Update isPublic to true */
     await DBClient.db.collection('files').updateOne(
       { _id: ObjectId(fileId) },
-      { $set: { isPublic: true } }
+      { $set: { isPublic: true } },
     );
 
     /* Return the updated file document */
@@ -169,7 +170,7 @@ class FilesController {
     /* Update isPublic to false */
     await DBClient.db.collection('files').updateOne(
       { _id: ObjectId(fileId) },
-      { $set: { isPublic: false } }
+      { $set: { isPublic: false } },
     );
 
     /* Return the updated file document */
@@ -178,6 +179,45 @@ class FilesController {
     });
 
     return res.status(200).json(updatedFile);
+  }
+
+  static async getFile(req, res) {
+    const fileId = req.params.id;
+    const userId = await RedisClient.get(`auth_${req.header('X-Token')}`);
+
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const file = await DBClient.db.collection('files').findOne({
+      _id: ObjectId(fileId),
+    });
+
+    if (!file) {
+      return res.status(404).json({ error: 'Not found' });
+    }
+
+    if (!file.isPublic && file.userId.toString() !== userId) {
+      return res.status(404).json({ error: 'Not found' });
+    }
+
+    if (file.type === 'folder') {
+      return res.status(400).json({ error: 'A folder doesn\'t have content' });
+    }
+
+    const filePath = file.localPath;
+
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: 'Not found' });
+    }
+
+    const mimeType = mime.lookup(filePath);
+
+    // Return the file content with the correct MIME-type
+    res.setHeader('Content-Type', mimeType);
+    const fileStream = fs.createReadStream(filePath);
+    fileStream.pipe(res);
+    return null;
   }
 }
 
